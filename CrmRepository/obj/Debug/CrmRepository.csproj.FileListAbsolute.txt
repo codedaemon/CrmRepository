@@ -1,0 +1,10 @@
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\CrmRepository.exe.config
+C:\Development\TestApplications\CrmRepository\CrmRepository\obj\Debug\CrmRepository.csprojResolveAssemblyReference.cache
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\CrmRepository.exe
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\CrmRepository.pdb
+C:\Development\TestApplications\CrmRepository\CrmRepository\obj\Debug\CrmRepository.exe
+C:\Development\TestApplications\CrmRepository\CrmRepository\obj\Debug\CrmRepository.pdb
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\MongoDB.Bson.dll
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\MongoDB.Driver.dll
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\MongoDB.Bson.xml
+C:\Development\TestApplications\CrmRepository\CrmRepository\bin\Debug\MongoDB.Driver.xml
