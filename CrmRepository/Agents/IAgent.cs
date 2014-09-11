@@ -9,5 +9,8 @@ namespace CrmRepository.Agents
     public interface IAgent
     {
         object GetInstance(object key);
+        object GetInstance(object key, IEnumerable<string> columns);
+        object GetValue(object key, string propertyName);
+        object GetKey(string propertyName, object propertyValue);
     }
 }

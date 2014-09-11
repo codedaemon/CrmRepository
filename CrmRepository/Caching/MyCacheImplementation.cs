@@ -63,6 +63,21 @@ namespace CrmRepository.Caching
             return null;
         }
 
+        public T GetInstance<T>(object key, IEnumerable<string> columns) where T : class
+        {
+            return GetInstance<T>(key);
+        }
+
+        public TResult GetValue<T, TResult>(object key, string propertyName) where T : class
+        {
+            return default(TResult);
+        }
+
+        public TResult GetKey<T, TProperty, TResult>(string propertyName, TProperty propertyValue) where T : class
+        {
+            return default(TResult);
+        }
+
         public void SetCacheDurationForType<T>(TimeSpan duration)
         {
             var type = typeof (T);

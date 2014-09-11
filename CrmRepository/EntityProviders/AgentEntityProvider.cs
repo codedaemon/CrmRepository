@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using CrmRepository.Agents;
@@ -15,6 +16,36 @@ namespace CrmRepository.EntityProviders
                 return (T)agent.GetInstance(key);
             }
             return null;
+        }
+
+        public T GetInstance<T>(object key, IEnumerable<string> columns) where T : class
+        {
+            var agent = GetAgent(typeof(T));
+            if (agent != null)
+            {
+                return (T) agent.GetInstance(key, columns);
+            }
+            return null;
+        }
+
+        public TResult GetValue<T, TResult>(object key, string propertyName) where T : class
+        {
+            var agent = GetAgent(typeof(T));
+            if (agent != null)
+            {
+                return (TResult)agent.GetValue(key, propertyName);
+            }
+            return default(TResult);
+        }
+
+        public TResult GetKey<T, TProperty, TResult>(string propertyName, TProperty propertyValue) where T : class
+        {
+            var agent = GetAgent(typeof(T));
+            if (agent != null)
+            {
+                return (TResult)agent.GetKey(propertyName, propertyValue);
+            }
+            return default(TResult);
         }
 
         private IAgent GetAgent(Type type)
