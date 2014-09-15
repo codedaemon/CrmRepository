@@ -12,6 +12,7 @@ namespace CrmRepository.Repository
     {
         T GetInstance<T>(object key) where T : class;
         T GetInstance<T>(object key, Func<T, object> columns ) where T : class, new();
+        T Get<T>(Func<T> function);
         TResult GetValue<T, TResult>(object key, Expression<Func<T, TResult>> property) where T : class;
         TResult GetKey<T, TProperty, TResult>(Expression<Func<T, TProperty>> property, TProperty propertyValue) where T : class;
     }

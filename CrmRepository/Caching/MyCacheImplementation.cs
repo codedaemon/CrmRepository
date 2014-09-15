@@ -1,18 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using CrmRepository.EntityProviders;
+using CrmRepository.Helpers;
 
 namespace CrmRepository.Caching
 {
     public class MyCacheImplementation :ICache, IEntityProvider
     {
         private Dictionary<Type, TypeCache> cache;
+        private Dictionary<Type, SingleValueTypeCache> singleValueCache;
 
         public TimeSpan DefaultCacheDuration { get; set; }
 
         public MyCacheImplementation()
         {
             cache = new Dictionary<Type, TypeCache>();
+            singleValueCache = new Dictionary<Type, SingleValueTypeCache>();
             DefaultCacheDuration = TimeSpan.FromMinutes(10);
         }
         public bool Save<T>(T instance)
@@ -26,7 +30,7 @@ namespace CrmRepository.Caching
             {
                 cache.Add(typeof(T), new TypeCache(DefaultCacheDuration));
             }
-            //if this item exist in cache, then update it. If not, delete it
+            //if this item exist in cache, then update it. If not, add it
             var typeCache = cache[typeof (T)];
             if (typeCache.CacheEntries.ContainsKey(key))
             {
@@ -39,6 +43,34 @@ namespace CrmRepository.Caching
                 typeCache.CacheEntries.Add(key, new TypeCacheEntry(instance, GenerateExpiryTime(typeCache.CacheDuration)));
             }
             return true;
+        }
+
+        public bool SaveSingleValue<T>(string lookupProperty, object lookupValue, string propertyToCache, object valueToCache)
+        {
+            SaveSingleValueInternal<T>(lookupProperty, lookupValue, propertyToCache, valueToCache);
+            SaveSingleValueInternal<T>(propertyToCache, valueToCache, lookupProperty, lookupValue);
+            return true;
+        }
+
+        private void SaveSingleValueInternal<T>(string lookupProperty, object lookupValue, string propertyToCache, object valueToCache)
+        {
+            if (!singleValueCache.ContainsKey(typeof (T)))
+            {
+                singleValueCache.Add(typeof (T), new SingleValueTypeCache());
+            }
+            //if this item exist in cache, then update it. If not, add it
+            var typeCache = singleValueCache[typeof (T)];
+            var key = GenerateSingleValueKey(lookupProperty, lookupValue, propertyToCache);
+            if (typeCache.CacheEntries.ContainsKey(key))
+            {
+                typeCache.CacheEntries[key] = new TypeCacheEntry(valueToCache, GenerateExpiryTime(FindShortestCacheDuration<T>(lookupProperty, propertyToCache)));
+                Console.WriteLine("Updated SingleValueCache with id " + key + " inside the cache for " + typeof (T).Name);
+            }
+            else
+            {
+                typeCache.CacheEntries.Add(key, new TypeCacheEntry(valueToCache, GenerateExpiryTime(FindShortestCacheDuration<T>(lookupProperty, propertyToCache))));
+                Console.WriteLine("Added SingleValueCache with id " + key + " inside the cache for " + typeof (T).Name);
+            }
         }
 
         public T GetInstance<T>(object key) where T : class
@@ -70,12 +102,14 @@ namespace CrmRepository.Caching
 
         public TResult GetValue<T, TResult>(object key, string propertyName) where T : class
         {
-            return default(TResult);
+            var cacheKey = GenerateSingleValueKey(Constants.IdProperty, key, propertyName);
+            return GetFromSingleValueCache<T, TResult>(cacheKey);
         }
 
         public TResult GetKey<T, TProperty, TResult>(string propertyName, TProperty propertyValue) where T : class
         {
-            return default(TResult);
+            var cacheKey = GenerateSingleValueKey(propertyName, propertyValue, Constants.IdProperty);
+            return GetFromSingleValueCache<T, TResult>(cacheKey);
         }
 
         public void SetCacheDurationForType<T>(TimeSpan duration)
@@ -87,13 +121,68 @@ namespace CrmRepository.Caching
             }
             else
             {
-                cache.Add(typeof(T), new TypeCache(duration));
+                cache.Add(type, new TypeCache(duration));
             }
+        }
+
+        public void SetCacheDurationForSingleValueType<T>(Expression<Func<T, object>> property, TimeSpan duration)
+        {
+            var type = typeof(T);
+            var key = ExpressionHelper.GetPropertyNameFromExpression(property);
+            if (!singleValueCache.ContainsKey(type))
+            {
+                singleValueCache.Add(type, new SingleValueTypeCache());
+            }
+            var typeCache = singleValueCache[type];
+            if (typeCache.PropertyCacheExpiry.ContainsKey(key))
+            {
+                typeCache.PropertyCacheExpiry[key] = duration;
+            }
+            else
+            {
+                typeCache.PropertyCacheExpiry.Add(key, duration);
+            }
+        }
+
+        private TResult GetFromSingleValueCache<T, TResult>(string key) where T:class
+        {
+            if (!singleValueCache.ContainsKey(typeof(T)))
+            {
+                return default(TResult);
+            }
+            var typeCache = singleValueCache[typeof(T)];
+            if (typeCache.CacheEntries.ContainsKey(key))
+            {
+                var cacheEntry = typeCache.CacheEntries[key];
+                if (HasCacheExpired(cacheEntry))
+                {
+                    Console.WriteLine("Found entry with id " + key + " from the " + typeof(T).Name + " SingleValueCache, but the item has expired.");
+                    typeCache.CacheEntries.Remove(key);
+                    return default(TResult);
+                }
+                Console.WriteLine("Returned entry with id " + key + " from the " + typeof(T).Name + " SingleValueCache.");
+                return (TResult)cacheEntry.Object;
+            }
+            return default(TResult);
+        }
+
+        private string GenerateSingleValueKey(string lookupProperty, object lookupValue, string cacheProperty)
+        {
+            return lookupProperty + "." + lookupValue + "=>" + cacheProperty;
         }
 
         private bool HasCacheExpired(TypeCacheEntry cacheEntry)
         {
             return DateTime.UtcNow > cacheEntry.CacheExpires;
+        }
+
+        private TimeSpan FindShortestCacheDuration<T>(string propertyName1, string propertyName2)
+        {
+            var typeCache = singleValueCache[typeof(T)];
+            var duration1 = typeCache.PropertyCacheExpiry.ContainsKey(propertyName1) ? typeCache.PropertyCacheExpiry[propertyName1] : DefaultCacheDuration;
+            var duration2 = typeCache.PropertyCacheExpiry.ContainsKey(propertyName2) ? typeCache.PropertyCacheExpiry[propertyName2] : DefaultCacheDuration;
+            Console.WriteLine("Cache duration for single value calculated to be " + (duration1 < duration2 ? duration1 : duration2));
+            return duration1 < duration2 ? duration1 : duration2;
         }
 
         private DateTime GenerateExpiryTime(TimeSpan cacheDuration)
@@ -133,6 +222,18 @@ namespace CrmRepository.Caching
             }
         }
 
+        private class SingleValueTypeCache
+        {
+            public Dictionary<object, TypeCacheEntry> CacheEntries { get; set; }
+            public Dictionary<string, TimeSpan> PropertyCacheExpiry { get; private set; }
+
+            public SingleValueTypeCache()
+            {
+                CacheEntries = new Dictionary<object, TypeCacheEntry>();
+                PropertyCacheExpiry = new Dictionary<string, TimeSpan>();
+            }
+        }
+
         private class TypeCacheEntry
         {
             public object Object { get; set; }
@@ -144,6 +245,7 @@ namespace CrmRepository.Caching
                 CacheExpires = expires;
             }
         }
+
     }
 
 

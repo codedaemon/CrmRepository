@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data.Entity.Design.PluralizationServices;
 using System.Globalization;
-using System.IO;
 using System.Linq;
+using CrmRepository.Entities;
 using MongoDB.Driver;
 
 namespace CrmRepository.EntityProviders
@@ -16,15 +16,25 @@ namespace CrmRepository.EntityProviders
 
         public MongoDbProvider()
         {
-
             var client = new MongoClient(ConnectionString);
             var server = client.GetServer();
             database = server.GetDatabase(DatabaseName);
 
+
+            var cust = new Customer
+            {
+                Id = Guid.NewGuid(),
+                Name = "Yet Another Customer",
+                Address = "Some other address",
+                Age = 17,
+                SecretAgentId = "008"
+            };
+            database.GetCollection<Customer>("Customers").Insert(cust);
         }
 
         public T GetInstance<T>(object key) where T : class
         {
+
             return GetInstance<T>(key, null, "Id");
         }
 

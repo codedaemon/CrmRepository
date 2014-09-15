@@ -5,6 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using CrmRepository.Caching;
 using CrmRepository.EntityProviders;
+using CrmRepository.Helpers;
 
 namespace CrmRepository.Repository
 {
@@ -57,14 +58,27 @@ namespace CrmRepository.Repository
             return null;
         }
 
+        public T Get<T>(Func<T> function)
+        {
+            //use the function to retrieve the items you are after
+            T result = function();
+            //if appropriate, add those items to the cache.
+            //return it
+            return result;
+        }
+
         public TResult GetValue<T, TResult>(object key, Expression<Func<T, TResult>> property) where T : class
         {
-            var propertyName = GetPropertyNameFromExpression(property);
+            var propertyName = ExpressionHelper.GetPropertyNameFromExpression(property);
             foreach (var provider in GetEntityProvidersForType<T>())
             {
                 TResult value = provider.GetValue<T, TResult>(key, propertyName);
                 if (value != null && !value.Equals(default(TResult)))
                 {
+                    if (provider != Cache)
+                    {
+                        Cache.SaveSingleValue<T>(Constants.IdProperty, key, propertyName, value);
+                    }
                     return value;
                 }
             }
@@ -73,12 +87,16 @@ namespace CrmRepository.Repository
 
         public TResult GetKey<T, TProperty, TResult>(Expression<Func<T, TProperty>> property, TProperty propertyValue) where T : class
         {
-            var propertyName = GetPropertyNameFromExpression(property);
+            var propertyName = ExpressionHelper.GetPropertyNameFromExpression(property);
             foreach (var provider in GetEntityProvidersForType<T>())
             {
                 TResult value = provider.GetKey<T, TProperty, TResult>(propertyName, propertyValue);
                 if (value != null && !value.Equals(default(TResult)))
                 {
+                    if (provider != Cache)
+                    {
+                        Cache.SaveSingleValue<T>(propertyName, propertyValue, Constants.IdProperty, value);
+                    }
                     return value;
                 }
             }
@@ -97,10 +115,7 @@ namespace CrmRepository.Repository
 
 
         //Helper methods
-        private static string GetPropertyNameFromExpression<T, TResult>(Expression<Func<T, TResult>> property) where T : class
-        {
-            return (((MemberExpression) property.Body).Member as PropertyInfo).Name;
-        }
+        
 
         private static IList<string> GetColumnList<T>(Func<T, object> columns) where T : class, new()
         {
